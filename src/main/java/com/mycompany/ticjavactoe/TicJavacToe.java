@@ -1,8 +1,12 @@
 package com.mycompany.ticjavactoe;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
@@ -15,7 +19,6 @@ import java.util.Scanner;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.Painter;
 
 /**
  *
@@ -72,14 +75,14 @@ public class TicJavacToe implements Runnable {
 
     //Fonts 
     private Font normalFont = new Font("Verdana", Font.BOLD, 32);
-    private Font smallFont = new Font("Verdana", Font.BOLD, 20);
-    private Font largeFont = new Font("Verdana", Font.BOLD, 50);
+    private Font smallerFont = new Font("Verdana", Font.BOLD, 20);
+    private Font largerFont = new Font("Verdana", Font.BOLD, 50);
 
     //Game Strings
     private String waitingString = "Waiting for another player to Connect...";
-    private String unableToCommunicateString = "Unable to communicate with opponent.";
-    private String playerWonString = "You have won!";
-    private String opponentWonString = "Opponent has won.";
+    private String unableToCommunicateWithOpponentString = "Unable to communicate with opponent.";
+    private String playerVictoryString = "You have won!";
+    private String opponentVictoryString = "Opponent has won.";
 
     public TicJavacToe() {
 
@@ -121,7 +124,24 @@ public class TicJavacToe implements Runnable {
     }
 
     private void tick() {
-        System.out.println("tick method works");
+        if (errors >= 10) {
+            unableToCommunicateWithOpponent = true;
+        }
+
+        if (!yourTurn && unableToCommunicateWithOpponent) {
+            try {
+                int space = dis.readInt();
+                if (circle) {
+                    spaces[space] = "X";
+                } else {
+                    spaces[space] = "O";
+                }
+                checkForEnemyWin();
+                yourTurn = true;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void listenForServerRequest() {
@@ -134,8 +154,8 @@ public class TicJavacToe implements Runnable {
             System.out.println("Client has requested to join and we have accepted!");
 
         } catch (IOException e) {
+            errors++;
             e.printStackTrace();
-
         }
     }
 
@@ -146,11 +166,76 @@ public class TicJavacToe implements Runnable {
             dos = new DataOutputStream(socket.getOutputStream());
             dis = new DataInputStream(socket.getInputStream());
             accepted = true;
+            return true;
         } catch (IOException e) {
+            errors++;
             System.out.println("Unable to connect to IP Address " + ip + " on port " + port + " | Starting a server");
             e.printStackTrace();
             return false;
         }
+
+    }
+
+    private void render(Graphics g) {
+        g.drawImage(board, 0, 0, null);
+        if (unableToCommunicateWithOpponent) {
+            g.setColor(Color.red);
+            g.setFont(smallerFont);
+            Graphics2D g2 = (Graphics2D) g;
+            //these two lines below allow us to set the anti-aliasing on text since this isnt 2006
+            //and also get the WIDTH of the string so we can center it
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            int stringWidth = g2.getFontMetrics().stringWidth(unableToCommunicateWithOpponentString);
+            g.drawString(unableToCommunicateWithOpponentString, WIDTH / 2 - stringWidth / 2, HEIGHT / 2);
+            return;
+        }
+
+        if (accepted) {
+            for (int i = 0; i < spaces.length; i++) {
+                if (spaces[i].equals("X")) {
+                    if (circle) {
+                        //the below formula will be used to calculate the proper square to draw images to
+                        g.drawImage(redX, (i % 3) * lengthOfSpace + 10 * (i % 3), (int) (i / 3), null);
+                    } else {
+                        g.drawImage(blueX, (i % 3) * lengthOfSpace + 10 * (i % 3), (int) (i / 3), null);
+                    }
+                } else if (spaces[i].equals("O")) {
+                    if (circle) {
+                        g.drawImage(blueCircle, (i % 3) * lengthOfSpace + 10 * (i % 3), (int) (i / 3), null);
+                    } else {
+                        g.drawImage(redCircle, (i % 3) * lengthOfSpace + 10 * (i % 3), (int) (i / 3), null);
+                    }
+                }
+            }
+            if (won || enemyWon) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setStroke(new BasicStroke(10));
+                g.setColor(Color.BLACK);
+                g.drawLine(firstSpot % 3 * lengthOfSpace + 10 * firstSpot % 3 + lengthOfSpace / 2, (int) (firstSpot / 3) * lengthOfSpace + 10 * (int) (firstSpot / 3) + lengthOfSpace / 2, secondSpot % 3 * lengthOfSpace + 10 * secondSpot % 3 + lengthOfSpace / 2, (int) (secondSpot) / 3 + lengthOfSpace / 2);
+
+                g.setColor(Color.RED);
+                g.setFont(largerFont);
+                if (won) {
+                    int stringWidth = g2.getFontMetrics().stringWidth(playerVictoryString);
+                    g.drawString(playerVictoryString, WIDTH / 2 - stringWidth / 2, HEIGHT / 2);
+                } else if (enemyWon) {
+                    int stringWidth = g2.getFontMetrics().stringWidth(opponentVictoryString);
+                    g.drawString(opponentVictoryString, WIDTH / 2 - stringWidth / 2, HEIGHT / 2);
+                }
+            }
+        } else {
+            g.setColor(Color.red);
+            g.setFont(normalFont);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            int stringWidth = g2.getFontMetrics().stringWidth(waitingString);
+            g.drawString(unableToCommunicateWithOpponentString, WIDTH / 2 - stringWidth / 2, HEIGHT / 2);
+
+        }
+    }
+
+    private void checkForEnemyWin() {
+        System.out.println("test");
     }
 
     private class Painter extends JPanel implements MouseListener {
@@ -201,10 +286,9 @@ public class TicJavacToe implements Runnable {
             redCircle = ImageIO.read(getClass().getResourceAsStream("/redCircle.png"));
             blueX = ImageIO.read(getClass().getResourceAsStream("/blueX.png"));
             blueCircle = ImageIO.read(getClass().getResourceAsStream("/blueCircle.png"));
-//            board = ImageIO.read(getClass().getResourceAsStream("/board.png"));
-//            board = ImageIO.read(getClass().getResourceAsStream("/board.png"));
 
         } catch (Exception e) {
+            errors++;
             throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
         }
     }
