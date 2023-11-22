@@ -8,6 +8,7 @@ import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
@@ -15,6 +16,7 @@ import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.Painter;
+
 /**
  *
  * @author davidpinto
@@ -94,7 +96,7 @@ public class TicJavacToe implements Runnable {
         }
 
         loadImages();
-        
+
         painter = new Painter();
         painter.setPreferredSize(new Dimension(WIDTH, HEIGHT));
     }
@@ -102,26 +104,69 @@ public class TicJavacToe implements Runnable {
     //Abstract run method since we've implemented "Runnable" in our class
     @Override
     public void run() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        while (true) {
+            tick();
+            painter.repaint();
+            if (!circle && !accepted) {
+                listenForServerRequest();
+            }
+        }
     }
 
+    //MAIN
     @SuppressWarnings("unused")
     public static void main(String[] args) {
         //creating an instance of our class to use, naming it something easier to type 100 times
         TicJavacToe tictactoe = new TicJavacToe();
     }
 
-    private class Painter extends JPanel implements MouseListener{
+    private void tick() {
+        System.out.println("tick method works");
+    }
 
-        public Painter(){
+    private void listenForServerRequest() {
+        Socket socket = null;
+        try {
+            socket = serverSocket.accept();
+            dos = new DataOutputStream(socket.getOutputStream());
+            dis = new DataInputStream(socket.getInputStream());
+            accepted = true;
+            System.out.println("Client has requested to join and we have accepted!");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+    }
+
+    private boolean connect() {
+        Socket socket = null;
+        try {
+            socket = new Socket(ip, port);
+            dos = new DataOutputStream(socket.getOutputStream());
+            dis = new DataInputStream(socket.getInputStream());
+            accepted = true;
+        } catch (IOException e) {
+            System.out.println("Unable to connect to IP Address " + ip + " on port " + port + " | Starting a server");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private class Painter extends JPanel implements MouseListener {
+
+        public Painter() {
             setFocusable(true);
             requestFocus();
             setBackground(Color.WHITE);
             addMouseListener(this); //Keep an eye on this as a leak in the constructor
         }
-        
-        
-        
+
+        @Override
+        public void paintComponent(Graphics g) {
+
+        }
+
         @Override
         public void mouseClicked(MouseEvent e) {
             throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
@@ -146,8 +191,9 @@ public class TicJavacToe implements Runnable {
         public void mouseExited(MouseEvent e) {
             throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
         }
-    
-}
+
+    }
+
     private void loadImages() {
         try {
             board = ImageIO.read(getClass().getResourceAsStream("/board.png"));
