@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
@@ -53,11 +54,20 @@ public class TicJavacToe implements Runnable {
     private BufferedImage blueCircle;
 
     private String[] spaces = new String[9];
-    /*     We'll need to represent our spaces as show below
+    /*     
+    We'll need to represent our spaces as show below 
+    
        | 0 | 1 | 2 |  
        | 3 | 4 | 5 |
        | 6 | 7 | 8 | 
+    
+    As well have an array with all possible wins
      */
+    private int[][] wins = new int[][]{
+        {0, 1, 2}, {3, 4, 5}, {6, 7, 8},
+        {0, 3, 6}, {1, 4, 7}, {2, 5, 8},
+        {0, 1, 2}, {3, 4, 5}
+    };
 
     //Game Logic
     private boolean yourTurn = false;
@@ -66,6 +76,7 @@ public class TicJavacToe implements Runnable {
     private boolean unableToCommunicateWithOpponent = false;
     private boolean won = false;
     private boolean enemyWon = false;
+    private boolean tie = false;
     private int errors = 0;
 
     //Board and line variables lengths/positions.
@@ -83,6 +94,7 @@ public class TicJavacToe implements Runnable {
     private String unableToCommunicateWithOpponentString = "Unable to communicate with opponent.";
     private String playerVictoryString = "You have won!";
     private String opponentVictoryString = "Opponent has won.";
+    private String tieString = "Game has ended in a tie!";
 
     public TicJavacToe() {
 
@@ -94,7 +106,7 @@ public class TicJavacToe implements Runnable {
 
         while (port < 1 && port > 65535) {
             System.out.println("Please enter a valid port number.");
-            System.out.println("Please input the poÏrt: ");
+            System.out.println("Please input the port: ");
             port = scanner.nextInt();
         }
 
@@ -137,9 +149,11 @@ public class TicJavacToe implements Runnable {
                     spaces[space] = "O";
                 }
                 checkForEnemyWin();
+                checkForTie();
                 yourTurn = true;
             } catch (IOException e) {
                 e.printStackTrace();
+                errors++;
             }
         }
     }
@@ -223,6 +237,13 @@ public class TicJavacToe implements Runnable {
                     g.drawString(opponentVictoryString, WIDTH / 2 - stringWidth / 2, HEIGHT / 2);
                 }
             }
+            if (tie) {
+                Graphics2D g2 = (Graphics2D) g;
+                g.setColor(Color.BLACK);
+                g.setFont(largerFont);
+                int stringWidth = g2.getFontMetrics().stringWidth(tieString);
+                g.drawString(tieString, WIDTH / 2, HEIGHT / 2);
+            }
         } else {
             g.setColor(Color.red);
             g.setFont(normalFont);
@@ -234,8 +255,49 @@ public class TicJavacToe implements Runnable {
         }
     }
 
+    private void checkForWin() {
+        for (int i = 0; i < wins.length; i++) {
+            if (circle) {
+                if (spaces[wins[i][0]] == "O" && spaces[wins[i][1]] == "O" && spaces[wins[i][2]] == "O") {
+                    firstSpot = wins[i][0];
+                    secondSpot = wins[i][2];
+                    won = true;
+                }
+            } else {
+                if (spaces[wins[i][0]] == "X" && spaces[wins[i][1]] == "X" && spaces[wins[i][2]] == "X") {
+                    firstSpot = wins[i][0];
+                    secondSpot = wins[i][2];
+                    won = true;
+                }
+            }
+        }
+    }
+
     private void checkForEnemyWin() {
-        System.out.println("test");
+        for (int i = 0; i < wins.length; i++) {
+            if (circle) {
+                if (spaces[wins[i][0]] == "X" && spaces[wins[i][1]] == "X" && spaces[wins[i][2]] == "X") {
+                    firstSpot = wins[i][0];
+                    secondSpot = wins[i][2];
+                    enemyWon = true;
+                }
+            } else {
+                if (spaces[wins[i][0]] == "O" && spaces[wins[i][1]] == "O" && spaces[wins[i][2]] == "O") {
+                    firstSpot = wins[i][0];
+                    secondSpot = wins[i][2];
+                    enemyWon = true;
+                }
+            }
+        }
+    }
+
+    private void checkForTie() {
+        for (int i = 0; i < spaces.length; i++) {
+            if (spaces[i] == null) {
+                return;
+            }
+        }
+        tie = true;
     }
 
     private class Painter extends JPanel implements MouseListener {
@@ -254,7 +316,37 @@ public class TicJavacToe implements Runnable {
 
         @Override
         public void mouseClicked(MouseEvent e) {
-            throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+            if (accepted) {
+                if (yourTurn && !unableToCommunicateWithOpponent && !won && !enemyWon) {
+                    int x = e.getX() / lengthOfSpace;
+                    int y = e.getY() / lengthOfSpace;
+                    y *= 3;
+                    int position = x + y;
+
+                    if (spaces[position] == null) {
+                        if (!circle) {
+                            spaces[position] = "X";
+                        } else {
+                            spaces[position] = "O";
+                        }
+                        yourTurn = false;
+                        repaint();
+                        Toolkit.getDefaultToolkit().sync();
+
+                        try {
+                            dos.writeInt(position);
+                            dos.flush();
+                        } catch (IOException e1) {
+                            errors++;
+                            e1.printStackTrace();
+                        }
+
+                        System.out.println("DATA WAS SENT");
+                        checkForWin();
+                        checkForTie();
+                    }
+                }
+            }
         }
 
         @Override
